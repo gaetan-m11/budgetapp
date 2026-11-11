@@ -2,7 +2,7 @@
 /* BudgetApp mobile — données sur l'appareil (IndexedDB), synchronisées avec le PC par un
    fichier JSON dans Google Drive. Montants en centimes entiers, jamais en flottants. */
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 const FILE_NAME = 'budget-sync.json';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const COLLECTIONS = ['accounts', 'categories', 'transactions', 'budgets'];
@@ -22,7 +22,7 @@ const pad = (n) => String(n).padStart(2, '0');
 
 function emptyState() {
   return { format: 1, settings: { currency: 'CHF', month_start_day: 1, updated_at: '' },
-    accounts: [], categories: [], transactions: [], budgets: [], tombstones: {} };
+    accounts: [], categories: [], transactions: [], budgets: [], tombstones: {}, upcoming: [] };
 }
 
 /* ---------------------------------------------------------------- état ---- */
@@ -118,11 +118,10 @@ const subCategories = (parent) => S.state.categories.filter((c) => c.parent === 
   .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
 /** Solde : initial + revenus - dépenses, transferts déplacés d'un compte à l'autre. */
-function balances() {
+function balances(limit = todayIso()) {
   const result = new Map(S.state.accounts.map((a) => [a.uuid, a.initial_balance_cents]));
-  const today = todayIso();
   for (const t of S.state.transactions) {
-    if (t.date > today) continue; // solde à la date du jour : le futur n'est pas encore compté
+    if (t.date > limit) continue; // par défaut, solde à la date du jour : le futur n'est pas compté
     const delta = t.type === 'income' ? t.amount_cents : -t.amount_cents;
     if (result.has(t.account)) result.set(t.account, result.get(t.account) + delta);
     if (t.type === 'transfer' && result.has(t.to_account)) {
@@ -130,6 +129,22 @@ function balances() {
     }
   }
   return result;
+}
+/** Solde total prévu à la date `end` : transactions datées jusque-là (y compris saisies avec
+    une date future) et opérations récurrentes attendues, transmises par le PC. */
+function projected(end) {
+  let total = 0;
+  for (const value of balances(end).values()) total += value;
+  let count = S.state.transactions.filter((t) => t.date > todayIso() && t.date <= end).length;
+  if (end > todayIso()) {
+    for (const item of S.state.upcoming || []) {
+      if (item.date > end) continue;
+      count += 1;
+      if (item.type === 'income') total += item.amount_cents;
+      else if (item.type === 'expense') total -= item.amount_cents;
+    }
+  }
+  return { total, count };
 }
 function inPeriod(from, to) {
   return S.state.transactions.filter((t) => t.date >= from && t.date <= to);
@@ -198,6 +213,8 @@ function merge(local, remote) {
     }
     if (!found && !local.tombstones[uuid]) local.tombstones[uuid] = deletedAt;
   }
+  // Opérations à venir : calculées par le PC, simplement recopiées.
+  if (Array.isArray(remote.upcoming)) local.upcoming = remote.upcoming;
   const shared = remote.settings || {};
   if (shared.updated_at && shared.updated_at > (local.settings.updated_at || '')) {
     local.settings = { ...shared };
@@ -214,7 +231,7 @@ function canonical(state) {
     }
     return value;
   };
-  const data = { settings: state.settings || {}, tombstones: state.tombstones || {} };
+  const data = { settings: state.settings || {}, tombstones: state.tombstones || {}, upcoming: state.upcoming || [] };
   for (const name of COLLECTIONS) {
     data[name] = [...(state[name] || [])].sort((a, b) => (a.uuid < b.uuid ? -1 : 1));
   }
@@ -408,6 +425,7 @@ function renderHome() {
   const categories = byId(S.state.categories);
   const accountNames = new Map(S.state.accounts.map((a) => [a.uuid, a.name]));
   const future = S.state.transactions.filter((t) => t.date > todayIso()).length;
+  const end = projected(to);
 
   const byCat = new Map();
   for (const t of inPeriod(from, to)) {
@@ -435,7 +453,7 @@ function renderHome() {
     <div class="kpis">
       <div class="kpi"><div class="cap">Revenus</div><div class="val pos">${bare(sums.income)}</div><div class="unit">${esc(currency())}</div></div>
       <div class="kpi"><div class="cap">Dépenses</div><div class="val neg">${bare(sums.expense)}</div><div class="unit">${esc(currency())}</div></div>
-      <div class="kpi"><div class="cap">Épargne</div><div class="val">${bare(sums.savings, true)}</div><div class="unit">revenus − dépenses</div></div>
+      <div class="kpi"><div class="cap">Fin de mois</div><div class="val ${end.total < 0 ? 'neg' : ''}">${bare(end.total)}</div><div class="unit">${end.count ? `${end.count} à venir` : esc(currency())}</div></div>
     </div>
     <div class="card"><h2>Dépenses par catégorie</h2>${catRows || '<div class="muted small">Aucune dépense sur ce mois.</div>'}</div>
     <div class="card"><h2>Comptes</h2>${accounts().map((a) => `<div class="row">
@@ -763,4 +781,4 @@ async function start() {
 start();
 
 // Exposé pour les tests de la fusion.
-window.BudgetApp = { merge, canonical, emptyState, parseAmount, fmt, period, budgetMonthOf, S };
+window.BudgetApp = { merge, canonical, emptyState, parseAmount, fmt, period, budgetMonthOf, projected, balances, S };
