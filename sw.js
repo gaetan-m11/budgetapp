@@ -1,5 +1,5 @@
 // Cache de l'application pour l'usage hors ligne. Changer VERSION à chaque mise à jour.
-const VERSION = 'budgetapp-1.0.1';
+const VERSION = 'budgetapp-1.0.2';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'icon-180.png', 'icon-512.png'];
 
