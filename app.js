@@ -2,7 +2,7 @@
 /* BudgetApp mobile — données sur l'appareil (IndexedDB), synchronisées avec le PC par un
    fichier JSON dans Google Drive. Montants en centimes entiers, jamais en flottants. */
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const FILE_NAME = 'budget-sync.json';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const COLLECTIONS = ['accounts', 'categories', 'transactions', 'budgets'];
@@ -120,7 +120,9 @@ const subCategories = (parent) => S.state.categories.filter((c) => c.parent === 
 /** Solde : initial + revenus - dépenses, transferts déplacés d'un compte à l'autre. */
 function balances() {
   const result = new Map(S.state.accounts.map((a) => [a.uuid, a.initial_balance_cents]));
+  const today = todayIso();
   for (const t of S.state.transactions) {
+    if (t.date > today) continue; // solde à la date du jour : le futur n'est pas encore compté
     const delta = t.type === 'income' ? t.amount_cents : -t.amount_cents;
     if (result.has(t.account)) result.set(t.account, result.get(t.account) + delta);
     if (t.type === 'transfer' && result.has(t.to_account)) {
@@ -405,6 +407,7 @@ function renderHome() {
     + S.state.accounts.filter((a) => a.archived).reduce((sum, a) => sum + (bal.get(a.uuid) || 0), 0);
   const categories = byId(S.state.categories);
   const accountNames = new Map(S.state.accounts.map((a) => [a.uuid, a.name]));
+  const future = S.state.transactions.filter((t) => t.date > todayIso()).length;
 
   const byCat = new Map();
   for (const t of inPeriod(from, to)) {
@@ -427,11 +430,12 @@ function renderHome() {
       <button class="btn primary" data-tab="settings">Ouvrir les réglages</button></div>`;
   }
   return `${monthBar()}
-    <div class="card hero"><div class="cap">Solde total</div><div class="big">${fmt(total)}</div></div>
+    <div class="card hero"><div class="cap">Solde total aujourd'hui</div><div class="big">${fmt(total)}</div>
+      ${future ? `<div class="cap">${future} transaction(s) à venir non comptée(s)</div>` : ''}</div>
     <div class="kpis">
       <div class="kpi"><div class="cap">Revenus</div><div class="val pos">${bare(sums.income)}</div><div class="unit">${esc(currency())}</div></div>
       <div class="kpi"><div class="cap">Dépenses</div><div class="val neg">${bare(sums.expense)}</div><div class="unit">${esc(currency())}</div></div>
-      <div class="kpi"><div class="cap">Épargne</div><div class="val">${bare(sums.savings, true)}</div><div class="unit">${esc(currency())}</div></div>
+      <div class="kpi"><div class="cap">Épargne</div><div class="val">${bare(sums.savings, true)}</div><div class="unit">revenus − dépenses</div></div>
     </div>
     <div class="card"><h2>Dépenses par catégorie</h2>${catRows || '<div class="muted small">Aucune dépense sur ce mois.</div>'}</div>
     <div class="card"><h2>Comptes</h2>${accounts().map((a) => `<div class="row">
@@ -614,6 +618,10 @@ function saveSheet() {
   if (amount === null || amount <= 0) return fail('Indiquez un montant supérieur à zéro.');
   if (!label) return fail('Le libellé est obligatoire.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test($('#fDate').value)) return fail('Date invalide.');
+  if ($('#fDate').value > todayIso() && $('#fDate').value !== t.date
+      && !confirm(`La date ${fmtDate($('#fDate').value)} est dans le futur. Est-ce bien la date voulue ?`)) {
+    return fail('Corrigez la date.');
+  }
   const account = $('#fAccount').value;
   if (!account) return fail('Le compte est obligatoire.');
   const transfer = t.type === 'transfer';
