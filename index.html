@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BudgetApp</title>
+  <meta name="theme-color" content="#F5F6FA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E1320" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BudgetApp">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="top">
+    <div>
+      <h1 id="title">BudgetApp</h1>
+      <p id="subtitle"></p>
+    </div>
+    <button id="syncBtn" class="sync" data-action="sync" aria-label="Synchroniser">
+      <span class="dot"></span><span id="syncLabel"></span>
+    </button>
+  </header>
+
+  <main id="view"></main>
+
+  <button id="fab" data-action="new" aria-label="Nouvelle transaction">+</button>
+
+  <nav id="tabs">
+    <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
+    <button data-tab="tx"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Transactions</span></button>
+    <button data-tab="budgets"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Budgets</span></button>
+    <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.2-1.3L14 3h-4l-.4 2.4a7 7 0 0 0-2.2 1.3l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.2 1.3L10 21h4l.4-2.4a7 7 0 0 0 2.2-1.3l2.3.9 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z"/></svg><span>Réglages</span></button>
+  </nav>
+
+  <div id="backdrop" class="hidden" data-action="close"></div>
+  <section id="sheet" class="hidden" aria-modal="true" role="dialog"></section>
+  <div id="toast" class="hidden"></div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js"></script>
+</body>
+</html>
